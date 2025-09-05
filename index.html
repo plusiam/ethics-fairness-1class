@@ -384,6 +384,13 @@
             box-shadow: 0 5px 20px rgba(67, 233, 123, 0.3);
         }
 
+        .btn-download-hq {
+            background: linear-gradient(135deg, #FA8BFF 0%, #2BD2FF 52%, #2BFF88 90%);
+            color: white;
+            box-shadow: 0 5px 20px rgba(250, 139, 255, 0.3);
+            font-size: 1.15em;
+        }
+
         .btn-print {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             color: white;
@@ -429,6 +436,47 @@
 
         .saved-message.show {
             right: 20px;
+        }
+
+        /* 로딩 오버레이 */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .loading-overlay.show {
+            display: flex;
+        }
+
+        .loading-spinner {
+            background: white;
+            padding: 30px 50px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
 
         @media (max-width: 768px) {
@@ -604,7 +652,8 @@
                 <div class="btn-group">
                     <button class="btn btn-clear" onclick="clearAll()">🔄 다시 작성</button>
                     <button class="btn btn-save" onclick="saveAnswers()">💾 저장하기</button>
-                    <button class="btn btn-download" onclick="downloadAsImage()">📸 이미지 다운로드</button>
+                    <button class="btn btn-download" onclick="downloadAsImage()">📸 일반 화질</button>
+                    <button class="btn btn-download-hq" onclick="downloadAsHighQualityImage()">🎨 고화질 다운로드</button>
                     <button class="btn btn-print" onclick="window.print()">🖨️ 인쇄하기</button>
                 </div>
             </div>
@@ -613,6 +662,15 @@
 
     <div class="saved-message" id="savedMessage">
         ✅ 답변이 저장되었습니다!
+    </div>
+
+    <!-- 로딩 오버레이 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>고화질 이미지를 생성 중입니다...</p>
+            <small>잠시만 기다려주세요</small>
+        </div>
     </div>
 
     <script>
@@ -681,7 +739,7 @@
             document.getElementById('progressText').textContent = `진행률: ${progress}% (${filled}/${total})`;
         }
 
-        // 이미지로 다운로드
+        // 일반 화질 이미지로 다운로드 (기존 함수)
         function downloadAsImage() {
             // 인물 소개 섹션 숨기기
             document.getElementById('characterIntro').style.display = 'none';
@@ -696,7 +754,7 @@
                 const date = new Date().toLocaleDateString('ko-KR');
                 const name = document.getElementById('studentName').value || '미입력';
                 link.download = `도덕활동지_${name}_${date.replace(/\./g, '-')}.png`;
-                link.href = canvas.toDataURL();
+                link.href = canvas.toDataURL('image/png');
                 link.click();
                 
                 // 인물 소개 섹션 다시 보이기
@@ -710,6 +768,108 @@
                     message.classList.remove('show');
                     message.textContent = '✅ 답변이 저장되었습니다!';
                 }, 3000);
+            });
+        }
+
+        // 고화질 이미지로 다운로드 (개선된 버전)
+        function downloadAsHighQualityImage() {
+            // 로딩 오버레이 표시
+            document.getElementById('loadingOverlay').classList.add('show');
+            
+            // 인물 소개 섹션 숨기기
+            document.getElementById('characterIntro').style.display = 'none';
+            
+            // 캡처할 요소의 실제 크기 가져오기
+            const element = document.getElementById('captureArea');
+            const rect = element.getBoundingClientRect();
+            
+            // 디바이스 픽셀 비율 고려
+            const devicePixelRatio = window.devicePixelRatio || 1;
+            
+            // html2canvas 고화질 설정
+            html2canvas(element, {
+                // 스케일 증가 (기본 2 → 4 이상)
+                scale: Math.max(4, devicePixelRatio * 2),
+                
+                // 캔버스 크기 직접 설정
+                width: rect.width,
+                height: rect.height,
+                
+                // 고화질 관련 옵션들
+                useCORS: true,
+                allowTaint: true,
+                logging: false,
+                backgroundColor: '#ffffff',
+                
+                // 폰트 렌더링 개선
+                letterRendering: true,
+                
+                // 이미지 품질 설정
+                imageTimeout: 0,
+                
+                // 캔버스 렌더링 옵션
+                windowWidth: element.scrollWidth,
+                windowHeight: element.scrollHeight,
+                
+                // 스크롤 위치 조정
+                x: 0,
+                y: 0,
+                
+                // 폰트 로딩 대기
+                onclone: function(clonedDoc) {
+                    // 클론된 문서에서 폰트가 완전히 로드되도록 대기
+                    const clonedElement = clonedDoc.getElementById('captureArea');
+                    if (clonedElement) {
+                        clonedElement.style.fontFamily = "'Noto Sans KR', -apple-system, sans-serif";
+                    }
+                }
+            }).then(canvas => {
+                // PNG 대신 JPEG로 저장 (품질 설정 가능)
+                const useJPEG = false; // true로 변경하면 JPEG로 저장 (파일 크기 감소)
+                
+                let dataURL;
+                let extension;
+                
+                if (useJPEG) {
+                    // JPEG 형식 (품질 95%)
+                    dataURL = canvas.toDataURL('image/jpeg', 0.95);
+                    extension = 'jpg';
+                } else {
+                    // PNG 형식 (최고 품질)
+                    dataURL = canvas.toDataURL('image/png');
+                    extension = 'png';
+                }
+                
+                // 다운로드 링크 생성
+                const link = document.createElement('a');
+                const date = new Date().toLocaleDateString('ko-KR');
+                const name = document.getElementById('studentName').value || '미입력';
+                link.download = `도덕활동지_고화질_${name}_${date.replace(/\./g, '-')}.${extension}`;
+                link.href = dataURL;
+                link.click();
+                
+                // 인물 소개 섹션 다시 보이기
+                document.getElementById('characterIntro').style.display = 'block';
+                
+                // 로딩 오버레이 숨기기
+                document.getElementById('loadingOverlay').classList.remove('show');
+                
+                // 성공 메시지
+                const message = document.getElementById('savedMessage');
+                message.textContent = '🎨 고화질 이미지가 다운로드되었습니다!';
+                message.classList.add('show');
+                setTimeout(() => {
+                    message.classList.remove('show');
+                    message.textContent = '✅ 답변이 저장되었습니다!';
+                }, 3000);
+            }).catch(error => {
+                console.error('이미지 생성 오류:', error);
+                
+                // 오류 발생 시 복구
+                document.getElementById('characterIntro').style.display = 'block';
+                document.getElementById('loadingOverlay').classList.remove('show');
+                
+                alert('이미지 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
             });
         }
 
